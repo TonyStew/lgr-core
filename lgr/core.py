@@ -1057,11 +1057,11 @@ class LGR(object):
             return False, label_parts, label_invalid_parts, INVALID_DISPOSITION, -1, log_output.getvalue()
 
         # Compute label disposition by analyzing reflexive mappings
-        (disposition, action_idx) = self._test_label_disposition(label, apply_reflexive_mapping=not is_variant)
+        (disposition, action_idx) = self._test_label_disposition(label, apply_reflexive_mapping=not is_variant, collect_log=collect_log)
         if disposition == INVALID_DISPOSITION:
-            rule_logger.error("Invalid disposition for reflexive mapping, "
-                              "triggered by action #%d", action_idx)
             if collect_log:
+                rule_logger.error("Invalid disposition for reflexive mapping, "
+                                "triggered by action #%d", action_idx)
                 rule_logger.removeHandler(ch)
             return False, [], [], disposition, action_idx, log_output.getvalue()
 
@@ -1146,7 +1146,8 @@ class LGR(object):
                 # Step 2 - 3
                 (variant_disp, idx) = self._apply_actions(variant_cp,
                                                           disp_set,
-                                                          only_variants)
+                                                          only_variants,
+                                                          collect_log=collect_log)
 
                 if variant_disp is None:
                     # 8.3.  Determining a Disposition for a Label or Variant Label
@@ -1451,7 +1452,7 @@ class LGR(object):
         else:
             return result, label_parts, label_invalid_parts, chars
 
-    def _test_label_disposition(self, label, apply_reflexive_mapping=True):
+    def _test_label_disposition(self, label, apply_reflexive_mapping=True, collect_log=True):
         """
         Compute the final disposition of a label.
 
@@ -1470,8 +1471,8 @@ class LGR(object):
         # Note: This function duplicate some code
         # from _test_preliminary_eligibility and both of them could be merged in
         # the same code but it feel cleaner to keep them separate.
-
-        rule_logger.info("Testing disposition of label %s", format_cp(label))
+        if collect_log:
+            rule_logger.info("Testing disposition of label %s", format_cp(label))
 
         # Init to True so we can use simple test. Need a final check before use
         only_variants = True
@@ -1481,13 +1482,15 @@ class LGR(object):
 
         for i in range(len(label)):
             cp = label[i]
-            rule_logger.debug("Code point: '%s'", format_cp(cp))
+            if collect_log:
+                rule_logger.debug("Code point: '%s'", format_cp(cp))
 
             try:
                 # Get the list of all char starting with this codepoint
                 char_list = self.repertoire.get_chars_from_prefix(cp)
             except NotInLGR:
-                rule_logger.info("No character in LGR starting with '%s'", cp)
+                if collect_log:
+                    rule_logger.info("No character in LGR starting with '%s'", cp)
                 # Don't care that code point is not in LGR:
                 # We know that label is valid, so it must be a code point
                 # sequence which was collected when considering the
@@ -1523,15 +1526,15 @@ class LGR(object):
 
         # Variants where encountered only if disp set is not empty
         only_variants = only_variants if len(disp_set) > 0 else False
+        if collect_log:
+            rule_logger.info("Label '%s' gave reflexive mapping "
+                            "with disposition set %s",
+                            format_cp(label), disp_set)
+            rule_logger.info("Label '%s' gave reflexive mapping "
+                            "with only variants: %s",
+                            format_cp(label), only_variants)
 
-        rule_logger.info("Label '%s' gave reflexive mapping "
-                          "with disposition set %s",
-                          format_cp(label), disp_set)
-        rule_logger.info("Label '%s' gave reflexive mapping "
-                          "with only variants: %s",
-                          format_cp(label), only_variants)
-
-        return self._apply_actions(label, disp_set, only_variants)
+        return self._apply_actions(label, disp_set, only_variants, collect_log=collect_log)
 
     def _get_prefix_list(self, label, label_prefix):
         """
@@ -1734,7 +1737,7 @@ class LGR(object):
                 for (cp, disp, is_variant, _) in char_perms:
                     yield cp, disp, is_variant
 
-    def _apply_actions(self, label, disp_set, only_variants):
+    def _apply_actions(self, label, disp_set, only_variants, collect_log=True):
         """
         Apply the defined action of an LGR to a label and its dispositions.
 
@@ -1754,15 +1757,17 @@ class LGR(object):
         action_list = self.effective_actions
         idx = 0
         for action in action_list:
-            rule_logger.info("Apply action %d (%s)",
-                             action_list.index(action), action)
+            if collect_log:
+                rule_logger.info("Apply action %d (%s)",
+                                action_list.index(action), action)
             disp = action.apply(label, disp_set, only_variants,
                                 self.rules_lookup, self.classes_lookup,
-                                self._unicode_database,)
+                                self._unicode_database, collect_log=collect_log)
             if disp is not None:
-                rule_logger.info("Action %d (%s) triggered",
-                                  action_list.index(action),
-                                  action)
+                if collect_log:
+                    rule_logger.info("Action %d (%s) triggered",
+                                    action_list.index(action),
+                                    action)
                 return disp, idx
 
             idx += 1

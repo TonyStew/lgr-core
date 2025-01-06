@@ -55,7 +55,7 @@ class Action(object):
 
     def apply(self, label, disp_set, only_variants,
               rules_lookup, classes_lookup,
-              unicode_database):
+              unicode_database, collect_log=True):
         """
         Apply an action to a label.
 
@@ -84,16 +84,18 @@ class Action(object):
             rule_matched = rule.matches(label,
                                         rules_lookup, classes_lookup,
                                         unicode_database)
-            rule_logger.info('Action %s: when rule matched: %s',
-                             self, rule_matched)
+            if collect_log:
+                rule_logger.info('Action %s: when rule matched: %s',
+                                self, rule_matched)
         # Second bullet
         elif self.not_match is not None:
             rule = rules_lookup[self.not_match]
             rule_matched = not rule.matches(label,
                                             rules_lookup, classes_lookup,
                                             unicode_database)
-            rule_logger.info('Action %s: not-when rule matched: %s',
-                             self, rule_matched)
+            if collect_log:
+                rule_logger.info('Action %s: not-when rule matched: %s',
+                                self, rule_matched)
 
         # Third bullet
         variant_matched = True
@@ -101,8 +103,9 @@ class Action(object):
             # Any single match may trigger an action that contains
             # an "any-variant" attribute
             variant_matched = len(self.any_variant & disp_set) > 0
-            rule_logger.info('Action %s: any-variant matched: %s',
-                             self, variant_matched)
+            if collect_log:
+                rule_logger.info('Action %s: any-variant matched: %s',
+                                self, variant_matched)
         # Fourth bullet
         elif self.all_variants is not None:
             # For an "all-variants" attribute,
@@ -110,8 +113,9 @@ class Action(object):
             # several of the types values specified in to trigger the action.
             variant_matched = (len(disp_set) > 0
                                and disp_set.issubset(self.all_variants))
-            rule_logger.info('Action %s: all-variants matched: %s',
-                             self, variant_matched)
+            if collect_log:
+                rule_logger.info('Action %s: all-variants matched: %s',
+                                self, variant_matched)
         # Fifth bullet
         elif self.only_variants is not None:
             # For an "only-variants" attribute,
@@ -125,16 +129,18 @@ class Action(object):
             variant_matched = (only_variants
                                and len(disp_set) > 0
                                and disp_set.issubset(self.only_variants))
-            rule_logger.info('Action %s: only-variants matched: %s',
-                             self, variant_matched)
+            if collect_log:
+                rule_logger.info('Action %s: only-variants matched: %s',
+                                self, variant_matched)
 
         # Last bullet: rule_matched and variant_matched are initialised to True
         if rule_matched and variant_matched:
-            rule_logger.info('Action %s triggered, disposition: %s',
-                             self, self.disp)
+            if collect_log:
+                rule_logger.info('Action %s triggered, disposition: %s',
+                                self, self.disp)
             return self.disp
-
-        rule_logger.info('Action %s not triggered', self)
+        if collect_log:
+            rule_logger.info('Action %s not triggered', self)
         return None
 
     def __repr__(self):
